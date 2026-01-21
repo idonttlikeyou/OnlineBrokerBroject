@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <canvas id="chart"></canvas>
+  <div class="tradingpanel">
+    <button id="order_buy" onclick="entry_long()">BUY</button>
+    <input id="order_lot" placeholder=0.01 type="number">
+    <button id="order_sell" onclick="entry_short()">SELL</button>
+    <br>
+    <button class="closeall" onclick="closeallposition()">Close All</button>
+  </div>
+  <div class="header">
+    <div class="symbolheader">
+      <img src="ALDIDR.png" class="symbolimg">
+      <span class="symboltext">ALDIDR • Aldrich Coin / Indonesia Rupiah</span>
+    </div>
+    <div class="symboldetails">
+      <span class="changeinpercentage" id="changeinpercentage">+0%</span>
+      <span class="changeinvalue" id="changeinvalue">+0.00</span>
+      <span class="currentvalue" id="currentprice">67.61</span>
+    </div>
+  </div>
+  <button id="refreshbutton" onclick="refresh()"><img src="reload.png" id="refreshimage"></button>
+  <div class="pings">
+    <img src="network_unavailable.png" id="pingimg">
+    <span id="pingtime">-</span>
+  </div>
+  <div id="ordermenu">
+    <button id="ordercancel" onclick="orderMenuCancel()">×</button>
+    <button id="orderclose" onclick="orderMenuClose()">CLOSE</button>
+    <button id="ordertp" onclick="orderMenuTP()">TP</button>
+    <button id="ordersl" onclick="orderMenuSL()">SL</button>
+    <button id="ordercontinue" onclick="orderMenuConfirm()">»</button>
+  </div>
+  <div id="changeorderconfirmation">
+    <div class="modifypositiontopbar">
+      <button id="backbutton" onclick="isCurrentlyInConfirmationScreen = false">←</button>
+      <span id="modifypositiontext">Modify Position #66667</span>
+      <span id="positiondetail">Sell 0.01 ALDIDR at 999.99</span><br>
+    </div>
+    <span id="displaycurrentprice">999.99</span>
+    <span id="displaycurrentask">999.99</span><br>
+    <input id="tpinput" type="number" placeholder="TP">
+    <input id="slinput" type="number" placeholder="SL">
+    <span id="warningandinformation">Placeholder</span>
+    <button id="buttoncontinue" onclick="modifyContinue()">Modify</button>
+  </div>
+
+
+
+
+  <div id="authscreenclickblocker"></div>
+  <div id="authscreen">
+    <h2>Account Authentication</h2>
+    <label for="accountid">Id:</label><br>
+    <input id="accountid" type="number"><br>
+    <label for="accountpassword">Password:</label><br>
+    <input id="accountpassword" type="password"><br>
+    <span class="createnew" onclick="createnewacc()"><u>Create New Account</u></span><br>
+    <button onclick="login()" id="loginbutton">Login</button>
+  </div>
+
+
+
+  <!-- Must be at the bottom -->
+  <div id="warningemblem" class="warningemblem">
+    <span id="warningdetail">Loading..</span>
+  </div>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js"></script>
+</body>
+</html>
