@@ -170,7 +170,7 @@ document.getElementById("order_lot").value = 0.01;
 let ws;
 //const ip = "10.254.220.116";
 //const ip = "192.168.0.109"; // permanent ig
-const ip = "shortcuts-heart-reviews-recovery.trycloudflare.com";
+const ip = "lafayette-sample-int-infringement.trycloudflare.com";
 //const ip = "127.0.0.1";
 //const port = 3000;
 //const port = 4040;
