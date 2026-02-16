@@ -115,6 +115,7 @@ let leverage;
 
 let positions = [];
 let orderflows = [];
+let closingpositionqueue = [];
 
 let chosenpositionticket;
 let positionfound = false;
@@ -442,12 +443,10 @@ WebSocket.prototype.send = function (data) {
   bytesOut += size;
   originalSend.call(this, data);
 };
-//const ip = "172.17.213.116";
+
 const ip = "192.168.0.109"; // permanent ig
-const url = "broker.aldrichprojects.online";
-//const ip = "127.0.0.1";
 const port = 3000;
-//const port = 4040;
+const url = "broker.aldrichprojects.online"
 
 // server connection watch
 function connect() {
@@ -568,7 +567,7 @@ function connect() {
       document.getElementById("authscreenclickblocker").style.pointerEvents = "";
     } else if (data.type === "newmessage") {
       newmessage(data);
-    } else if(data.type === "accrequests") {
+    } else if (data.type === "accrequests") {
       let txt = "[\n";
       for (const acc of data.data) {
         txt += `  {id: ${acc.id}, name: ${acc.name}, reqbal: ${acc.balance}},\n`;
@@ -577,15 +576,20 @@ function connect() {
       popup(`<p class="enablewspc">${txt}</p>`, false, true);
     } else if (data.type === "popup") {
       popup(data.html, data.ok, data.cancel);
-    } else if(data.type === "accstatus") {
-      const displaystatus = data.status === "active" ? "Active" : data.status === "pending" ? "Pending" : "Denied / Not Exist";
+    } else if (data.type === "accstatus") {
+      const displaystatus = data.status === "active" ? "Active": data.status === "pending" ? "Pending": "Denied / Not Exist";
       popup(`
-      <h3>Account Status</h3>
-      <span class="${data.status}">Id: ${data.id}</span><br>
-      <div id="accstatusdiv">
+        <h3>Account Status</h3>
+        <span class="${data.status}">Id: ${data.id}</span><br>
+        <div id="accstatusdiv">
         <span class="dot ${data.status}"></span><span>${displaystatus}</span>
-      </div>
-      `, true, false, "accstatusresponse");
+        </div>
+        `, true, false, "accstatusresponse");
+    } else if (data.type === "closingposition") {
+      closingpositionqueue.push({
+        side: data.side,
+        price: data.side === "short" ? currentaskprice : currentprice
+      });
     }
   };
 }
@@ -1021,6 +1025,22 @@ function updateloop() {
         ctx.textAlign = "left";
         ctx.fillText("SL", 0, getpositionfromprice(visiblehigh, visiblelow, pos.sl));
       }
+    }
+
+    if (closingpositionqueue.length > 0) {
+      const pos = closingpositionqueue[0];
+      const Ypos = getpositionfromprice(visiblehigh, visiblelow, pos.price);
+      ctx.strokeStyle = "#888888";
+      ctx.beginPath();
+      ctx.moveTo(0, Ypos);
+      ctx.lineTo(pricebarleftposition, Ypos);
+      ctx.stroke();
+      ctx.font = `${unitedFontSize}px monospace`;
+      ctx.fillStyle = "#888888";
+      ctx.textBaseline = "bottom";
+      ctx.textAlign = "left";
+      ctx.fillText(`${pos.side === "short" ? "BUY": "SELL"}`, 0, Ypos);
+      closingpositionqueue.splice(0, 1);
     }
 
     if (temptp !== -1) {
@@ -2177,7 +2197,7 @@ popup(`
 }
 
 function checkaccavailability() {
-  popup(`
+popup(`
 <h3>Check account status</h3>
 <label for="accountcheckid">Id: </label><br>
 <input class="coolinput" id="accountcheckid"><br><br>
@@ -2185,10 +2205,10 @@ function checkaccavailability() {
 }
 
 function checkaccountstatus() {
-  ws.send(JSON.stringify({
-    type: "checkaccstatus",
-    id: Number(document.getElementById("accountcheckid").value)
-  }));
+ws.send(JSON.stringify({
+type: "checkaccstatus",
+id: Number(document.getElementById("accountcheckid").value)
+}));
 }
 
 function requestnewaccount() {
