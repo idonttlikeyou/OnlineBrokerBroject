@@ -97,6 +97,8 @@ let frames = 0;
 let fps = 0;
 
 let leftmostcandleinscreenunaffectedidx = 0;
+let onlineusers;
+let leaderboard = [];
 
 let candles = [];
 let currentopen;
@@ -573,7 +575,7 @@ function connect() {
         txt += `  {id: ${acc.id}, name: ${acc.name}, reqbal: ${acc.balance}},\n`;
       }
       txt += "]";
-      popup(`<p class="enablewspc">${txt}</p>`, false, true);
+      popup(`<h3>Pending account requests</h3><br><p class="enablewspc">${txt}</p>`, false, true);
     } else if (data.type === "popup") {
       popup(data.html, data.ok, data.cancel);
     } else if (data.type === "accstatus") {
@@ -588,8 +590,20 @@ function connect() {
     } else if (data.type === "closingposition") {
       closingpositionqueue.push({
         side: data.side,
-        price: data.side === "short" ? currentaskprice : currentprice
+        price: data.side === "short" ? currentaskprice: currentprice
       });
+    } else if (data.type === "onlineusersupdate") {
+      onlineusers = data.onlineusers;
+    } else if (data.type === "question") {
+      if (data.question === "leaderboard?" && bottombarusage === "leaderboard") {
+        ws.send(JSON.stringify({
+          type: "answer",
+          question: "leaderboard?",
+          answer: true
+        }));
+      }
+    } else if (data.type === "leaderboardupdate") {
+      leaderboard = data.users;
     }
   };
 }
@@ -1211,6 +1225,12 @@ function updateloop() {
     ctx.textBaseline = "top";
     ctx.fillText(`${fps} FPS`, pricebarleftposition, screenHeight-Ybottombar+unitedFontSize*2.5);
 
+    ctx.fillStyle = "#00ff00";
+    ctx.font = `${unitedFontSize/1.5}px monospace`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.fillText(`Online Users: ${onlineusers ?? "Loading..."}`, pricebarleftposition, screenHeight-Ybottombar+unitedFontSize*3);
+
     ctx.strokeStyle = "#444444";
     ctx.beginPath();
     ctx.moveTo(0, screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4)
@@ -1218,16 +1238,23 @@ function updateloop() {
     ctx.stroke();
 
     const padding = unitedFontSize/4;
-    ctx.fillStyle = color_buy;
+    ctx.fillStyle = color_clickableBlue;
     ctx.font = `${unitedFontSize}px monospace`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    const postxtw = ctx.measureText("Positions").width;
     if (bottombarusage === "positions") btmbrtxt = "Positions";
     else if (bottombarusage === "orderbook") btmbrtxt = "Order Book";
+    else if (bottombarusage === "leaderboard") btmbrtxt = "Leaderboard";
+    const postxtw = ctx.measureText(btmbrtxt).width;
     ctx.fillText(btmbrtxt, pricebarleftposition/2, screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4+padding);
+    
+    ctx.strokeStyle = color_clickableBlue;
+    ctx.beginPath();
+    ctx.moveTo(pricebarleftposition/2-postxtw/2-(padding*0.5), screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*5+padding);
+    ctx.lineTo(pricebarleftposition/2+postxtw/2+(padding*0.5), screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*5+padding);
+    ctx.stroke();
     if (isunclickingrn && touchX > pricebarleftposition/2-postxtw/2 && touchX < pricebarleftposition/2+postxtw/2 && touchY > screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4+padding && touchY < screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4+padding+unitedFontSize) {
-      popup('<h3>Change What Bottombar Shows</h3><br><span>Choose:</span><br><button class="textoption" onclick="showpositions()">- Positions</button><br><button class="textoption" onclick="showorderbook()">- OrderBook</button>', false, true, "bottombarshows");
+      popup('<h3>Change What Bottombar Shows</h3><br><span>Choose:</span><br><button class="textoption" onclick="showpositions()">- Positions</button><br><button class="textoption" onclick="showorderbook()">- OrderBook</button><br><button class="textoption" onclick="showleaderboard()">- Leaderboard</button>', false, true, "bottombarshows");
     }
 
     ctx.strokeStyle = "#444444";
@@ -1340,6 +1367,12 @@ function updateloop() {
         ctx.moveTo(screenWidth*1.6+bottombarXoffset, positionsstartingposition+unitedFontSize+padding*2+bottombarYoffset);
         ctx.lineTo(screenWidth*1.6+bottombarXoffset, positionsstartingposition+bottombarYoffset);
         ctx.stroke();
+      } else {
+        ctx.fillStyle = "#888888";
+        ctx.font = `${unitedFontSize}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Nothing to see here :)", pricebarleftposition*0.5, screenHeight-((screenHeight-positionsstartingposition)+unitedFontSize+padding*2)/2);
       }
       for (let i = 0; i < positions.length; i++) {
         const pos = positions[i];
@@ -1587,6 +1620,84 @@ function updateloop() {
         ctx.textBaseline = "top";
         ctx.fillText(Number(order.prc).toFixed(2), screenWidth*0.675, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*4+unitedFontSize*2);
       }
+    } else if (bottombarusage === "leaderboard") {
+      if (leaderboard.length > 0) {
+        ctx.fillStyle = foregroundColor;
+        ctx.font = `${unitedFontSize}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText("Rank", screenWidth*0.075, positionsstartingposition+padding);
+
+        ctx.strokeStyle = "#444444";
+        ctx.beginPath();
+        ctx.moveTo(screenWidth*0.15, positionsstartingposition);
+        ctx.lineTo(screenWidth*0.15, positionsstartingposition+unitedFontSize+padding);
+        ctx.stroke();
+
+        ctx.fillStyle = foregroundColor;
+        ctx.font = `${unitedFontSize}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText("Name", screenWidth*0.325, positionsstartingposition+padding);
+
+        ctx.strokeStyle = "#444444";
+        ctx.beginPath();
+        ctx.moveTo(screenWidth*0.50, positionsstartingposition);
+        ctx.lineTo(screenWidth*0.50, positionsstartingposition+unitedFontSize+padding);
+        ctx.stroke();
+
+        ctx.fillStyle = foregroundColor;
+        ctx.font = `${unitedFontSize}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText("Equity", screenWidth*0.675, positionsstartingposition+padding);
+
+        ctx.strokeStyle = "#444444";
+        ctx.beginPath();
+        ctx.moveTo(0, positionsstartingposition+unitedFontSize+padding);
+        ctx.lineTo(pricebarleftposition, positionsstartingposition+unitedFontSize+padding);
+        ctx.stroke();
+
+        for (let i = 0; i < leaderboard.length; i++) {
+          const user = leaderboard[i];
+
+          ctx.fillStyle = foregroundColor;
+          ctx.font = `${unitedFontSize}px monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(`${i+1}`, screenWidth*0.075, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize);
+
+          ctx.strokeStyle = "#444444";
+          ctx.beginPath();
+          ctx.moveTo(screenWidth*0.15, positionsstartingposition+unitedFontSize*i+padding+unitedFontSize);
+          ctx.lineTo(screenWidth*0.15, positionsstartingposition+unitedFontSize*(i+1)+padding*(i+1)*2+padding+unitedFontSize);
+          ctx.stroke();
+
+          ctx.fillStyle = foregroundColor;
+          ctx.font = `${unitedFontSize}px monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(user.name, screenWidth*0.325, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize);
+
+          ctx.strokeStyle = "#444444";
+          ctx.beginPath();
+          ctx.moveTo(screenWidth*0.50, positionsstartingposition+unitedFontSize*i+padding+unitedFontSize);
+          ctx.lineTo(screenWidth*0.50, positionsstartingposition+unitedFontSize*(i+1)+padding*(i+1)*2+padding+unitedFontSize);
+          ctx.stroke();
+
+          ctx.fillStyle = foregroundColor;
+          ctx.font = `${unitedFontSize}px monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(user.equity, screenWidth*0.675, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize);
+        }
+      } else {
+        ctx.fillStyle = "#888888";
+        ctx.font = `${unitedFontSize}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Loading...", pricebarleftposition*0.5, screenHeight-((screenHeight-positionsstartingposition)+unitedFontSize+padding*2)/2);
+      }
     }
 
     ctx.restore();
@@ -1720,7 +1831,6 @@ function updateloop() {
   hsl(${document.getElementById("hue").value},100%,100%)
   )`;
   document.getElementById("previewcolor").style.background = `hsl(${document.getElementById("hue").value},${document.getElementById("saturation").value*100}%,${document.getElementById("lightness").value*100}%)`;
-
 
 
   isunclickingrn = false;
@@ -1927,6 +2037,11 @@ function showorderbook() {
 function showpositions() {
   popupclose();
   bottombarusage = "positions";
+}
+
+function showleaderboard() {
+  popupclose();
+  bottombarusage = "leaderboard";
 }
 
 function reloadColors() {
