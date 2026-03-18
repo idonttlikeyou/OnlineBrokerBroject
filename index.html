@@ -46,7 +46,8 @@
     <label for="accountpassword">Password:</label><br>
     <input id="accountpassword" type="password"><br>
     <span class="createnew" onclick="createnewacc()"><u>Create New Account</u></span><br>
-    <button onclick="login()" id="loginbutton">Login</button>
+    <button onclick="login()" id="loginbutton">Login</button><br>
+    <span class="createnew" onclick="checkaccavailability()"><u>Check account availability</u></span><br>
   </div>
   <div id="globalchat">
     <div id="globalchatheader">
@@ -61,7 +62,7 @@
       <button onclick="sendmessage()">Send</button>
     </div>
   </div>
-  <span style="position: fixed; bottom: 0%; left: 50%; transform: translateX(-50%); color: white; font-size: 0.5em;">Version 1.3.03</span>
+  <span style="position: fixed; bottom: 0%; left: 50%; transform: translateX(-50%); color: white; font-size: 0.5em;">Version 1.3.04 (Optimization hotfix)</span>
 
 
   <!-- Must be at the bottom -->
@@ -89,6 +90,6 @@
     <span id="warningdetail">Loading..</span>
   </div>
   <link rel="stylesheet" href="style.css">
-  <script src="script.js"></script>
+  <script src="script.js?v=1_3_03"></script>
 </body>
 </html>

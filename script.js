@@ -782,7 +782,7 @@ function updateloop() {
 
     leftmostcandleinscreenunaffectedidx = Math.round((candlewidth - (leftmostcandleposition + Xoffset))/candlewidth)-6;
 
-    for (let i = 0; i < candles.length; i++) {
+    for (let i = leftmostcandleinscreen-5; i < candles.length; i++) {
       if (i%Math.floor(totalcandlesinscreen/4) === 0) {
         ctx.font = `${unitedFontSize}px monospace`;
         ctx.fillStyle = foregroundColor;
@@ -795,7 +795,7 @@ function updateloop() {
     ctx.beginPath();
     ctx.rect(0, (screenHeight/100)*5, pricebarleftposition, screenHeight-Ybottombar-unitedFontSize*1.5-(screenHeight/100)*5);
     ctx.clip();
-    for (let i = 0; i < candles.length; i++) {
+    for (let i = leftmostcandleinscreen-5; i < candles.length; i++) {
       let candle = candles[i];
       if (candles[i-5] == undefined) continue;
       if (leftmostcandleposition+((i+5)*candlewidth)+candlewidth+Xoffset < -candlewidth || leftmostcandleposition+((i+1)*candlewidth)+Xoffset > screenWidth+candlewidth) continue;
@@ -973,7 +973,13 @@ function updateloop() {
       ctx.stroke();
 
       const postext = `${pos.side === "short" ? "SELL": "BUY"} ${pos.lot}, `;
-      const floatingpltext = `${pos.floatingpl < 0 ? Number(pos.floatingpl).toFixed(2): `+${Number(pos.floatingpl).toFixed(2)}`}`;
+      const floatingpltext = `${pos.floatingpl < 0 ? Number(pos.floatingpl).toLocaleString('id-ID', {
+        style: 'currency',
+        currency: 'IDR'
+      }): `+${Number(pos.floatingpl).toLocaleString('id-ID', {
+        style: 'currency',
+        currency: 'IDR'
+      })}`}`;
       const postxtw = ctx.measureText(postext).width;
       ctx.font = `${unitedFontSize}px monospace`;
       if (positionfound && Number(pos.ticket) === Number(chosenpositionticket)) {
@@ -1144,28 +1150,43 @@ function updateloop() {
 
     const ismargincall = equity < margin*0.4;
     ctx.fillStyle = ismargincall ? color_marginCall: foregroundColor;
-    const equitytxt = `Equity: ${Number(equity).toFixed(2)}`;
+    const equitytxt = `Equity: ${Number(equity).toLocaleString('id-ID', {
+      style: 'currency',
+      currency: 'IDR'
+    })}`;
     ctx.font = `${unitedFontSize}px monospace`;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(equitytxt, 0, screenHeight-Ybottombar+screenHeight*0.01);
 
     ctx.fillStyle = ismargincall ? color_marginCall: foregroundColor;
-    const margintxt = `Margin: ${Number(margin).toFixed(2)}`;
+    const margintxt = `Margin: ${Number(margin).toLocaleString('id-ID', {
+      style: 'currency',
+      currency: 'IDR'
+    })}`;
     ctx.font = `${unitedFontSize}px monospace`;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(margintxt, 0, screenHeight-Ybottombar+screenHeight*0.01+unitedFontSize*1);
 
     ctx.fillStyle = ismargincall ? color_marginCall: foregroundColor;
-    const freemargintxt = `Free Margin: ${Number(freemargin).toFixed(2)}`;
+    const freemargintxt = `Free Margin: ${Number(freemargin).toLocaleString('id-ID', {
+      style: 'currency',
+      currency: 'IDR'
+    })}`;
     ctx.font = `${unitedFontSize}px monospace`;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(freemargintxt, 0, screenHeight-Ybottombar+screenHeight*0.01+unitedFontSize*2);
 
     ctx.fillStyle = Number(floatingpl) < 0? color_sell: color_buy;
-    const floatingpltxt = `Floating P/L: ${Number(floatingpl) < 0 ? `${Number(floatingpl).toFixed(2)}`: `+${Number(floatingpl).toFixed(2)}`}`;
+    const floatingpltxt = `Floating P/L: ${Number(floatingpl) < 0 ? `${Number(floatingpl).toLocaleString('id-ID', {
+      style: 'currency',
+      currency: 'IDR'
+    })}`: `+${Number(floatingpl).toLocaleString('id-ID', {
+      style: 'currency',
+      currency: 'IDR'
+    })}`}`;
     ctx.font = `${unitedFontSize}px monospace`;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -1247,7 +1268,7 @@ function updateloop() {
     else if (bottombarusage === "leaderboard") btmbrtxt = "Leaderboard";
     const postxtw = ctx.measureText(btmbrtxt).width;
     ctx.fillText(btmbrtxt, pricebarleftposition/2, screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4+padding);
-    
+
     ctx.strokeStyle = color_clickableBlue;
     ctx.beginPath();
     ctx.moveTo(pricebarleftposition/2-postxtw/2-(padding*0.5), screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*5+padding);
@@ -2293,6 +2314,10 @@ box.scrollTop = box.scrollHeight;
 }
 
 function createnewacc() {
+  if(!isConnectedToServer) {
+    alertemblem("Cannot create account. Disconnected from server");
+    return;
+  }
 popup(`
 <h3>Request create new account</h3>
 <span>Note: You wont be able to use your account until its accepted. You can check your account's avaibility using the button below.</span><br>
@@ -2304,7 +2329,7 @@ popup(`
 <input class="coolinput" id="accountpwrequest" type="password"><br>
 <label for="accountpwconfirmrequest">Confirm Password: </label><br>
 <input class="coolinput" id="accountpwconfirmrequest" type="password"><br>
-<label for="accountbalrequest">Starting Balance (< Rp.25000) (optional): </label><br>
+<label for="accountbalrequest">Starting Balance (< Rp.2500000) (optional): </label><br>
 <input class="coolinput" id="accountbalrequest" type="number"><br>
 <span id="requestwarnings" style="color: red;"></span><br>
 <button style="position: fixed; left: 50%; transform: translateX(-50%);" class="button_cool" id="sendrequestbutton" onclick="requestnewaccount()">Send Request!</button>
@@ -2330,10 +2355,10 @@ function requestnewaccount() {
 const name = document.getElementById("accountnamerequest").value;
 const password = document.getElementById("accountpwrequest").value;
 const confirmpw = document.getElementById("accountpwconfirmrequest").value;
-if (Number(document.getElementById("accountbalrequest").value) > 25000) {
-document.getElementById("accountbalrequest").value = 25000;
+if (Number(document.getElementById("accountbalrequest").value) > 2500000) {
+document.getElementById("accountbalrequest").value = 2500000;
 }
-const bal = Math.max(Math.min(Number(document.getElementById("accountbalrequest").value), 25000), 0);
+const bal = Math.max(Math.min(Number(document.getElementById("accountbalrequest").value), 2500000), 0);
 // lah kok 2 kali? biar apa? ya biarin😹
 const requestwarnings = document.getElementById("requestwarnings");
 let reqwarn = "";
