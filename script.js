@@ -15,6 +15,7 @@ async function loadsounds() {
   await load("ok", "ok.wav");
   await load("error", "error.wav");
   await load("close", "popup.wav");
+  await load("orderfilled", "order_filled.wav");
 }
 loadsounds();
 
@@ -56,6 +57,8 @@ function playsound(sound) {
     addtoqueue(buffers.close, 1, 1);
   } else if (sound === "error") {
     addtoqueue(buffers.error, 1, 1);
+  } else if (sound === "Order Filled") {
+    addtoqueue(buffers.orderfilled, 1, 1);
   }
 }
 
@@ -116,6 +119,7 @@ let floatingpl;
 let leverage;
 
 let positions = [];
+let orders = [];
 let orderflows = [];
 let closingpositionqueue = [];
 
@@ -332,10 +336,8 @@ function movingEvent() {
     const Xoffsetbefore = Xoffset;
     Yoffset += deltaY;
     Xoffset += deltaX;
-    if (Xoffset < candlewidth*-4) {
-      Xoffset = candlewidth*-4;
-    }
-    if (Xoffset > candlewidth*(candles.length-totalcandlesinscreen)) Xoffset = candlewidth*(candles.length-totalcandlesinscreen);
+    Xoffset = Math.max(Xoffset, candlewidth*-4);
+    Xoffset = Math.min(candlewidth*(candles.length-totalcandlesinscreen), Xoffset);
     if (candles[leftmostcandleinscreenunaffectedidx] == undefined && deltaX > 0) {
       Xoffset = Xoffsetbefore-1;
     }
@@ -353,7 +355,6 @@ function movingEvent() {
   if (ismovingpositionsdisplay) {
     bottombarXoffset += deltaX;
     bottombarYoffset += deltaY;
-    bottombarYoffset = Math.max(bottombarYoffset, (((unitedFontSize*positions.length + (unitedFontSize/4)*positions.length*2)-(screenHeight-(screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*5+(unitedFontSize/4)*2)))*-1) - screenHeight*0.04-unitedFontSize);
     bottombarYoffset = Math.min(bottombarYoffset, 0);
     bottombarXoffset = Math.min(bottombarXoffset, 0);
     bottombarXoffset = Math.max(bottombarXoffset, screenWidth/-1.6-(screenWidth-pricebarleftposition));
@@ -371,7 +372,22 @@ function movingEvent() {
 }
 
 function onlyClickingEvent() {
-  isCrosshairEnabled = false;
+  let priceLabelX = pricebarleftposition;
+    let priceLabelY = getpositionfromprice(visiblehigh, visiblelow, currentprice)-(screenWidth-pricebarleftposition)/8;
+    let priceLabelH = (screenWidth-pricebarleftposition)/4;
+    let crosshairLabelY = crosshairY-(screenWidth-pricebarleftposition)/8;
+  if(touchX > priceLabelX-unitedFontSize/6-priceLabelH && touchY > crosshairLabelY && touchX < priceLabelX-unitedFontSize/6-priceLabelH+Math.floor(priceLabelH) && touchY < crosshairLabelY+Math.floor(priceLabelH) && isCrosshairEnabled) {
+    const crosshairprice = Math.round(getpricefromposition(visiblehigh, visiblelow, crosshairY)*100)/100;
+    const limit = currentprice > crosshairprice ? "buy" : "sell";
+    const stop = currentprice < crosshairprice ? "buy" : "sell";
+    const lot = document.getElementById("order_lot").value;
+    popup(`
+    <button onclick="addlimit('${limit}', ${crosshairprice})">Add ${limit} limit ${lot} to aldidr at ${crosshairprice}</button><br>
+    <button onclick="addstop('${stop}', ${crosshairprice})">Add ${stop} stop ${lot} to aldidr at ${crosshairprice}</button><br>
+    `, false, true)
+  } else {
+    isCrosshairEnabled = false;
+  }
   positionfound = false;
   iscurrentlychoosingtp = false;
   iscurrentlychoosingsl = false;
@@ -537,6 +553,7 @@ function connect() {
       floatingpl = +data.floatingpl;
       leverage = +data.leverage;
     } else if (data.type === "positionsUpdate") {
+      orders = data.orders;
       positions = data.positions;
       for (const pos of positions) {
         if (pos.side === "long") {
@@ -766,7 +783,7 @@ function updateloop() {
     if (!freemove) {
       visiblehigh = candles[leftmostcandleinscreen]?.high ?? currenthigh;
       visiblelow = candles[leftmostcandleinscreen]?.low ?? currentlow;
-      for (let i = leftmostcandleinscreen; i < leftmostcandleinscreen+totalcandlesinscreen; i++) {
+      for (let i = leftmostcandleinscreen; i < leftmostcandleinscreen+totalcandlesinscreen+1; i++) {
         if (candles[i] == undefined) continue;
         visiblehigh = Math.max(visiblehigh, candles[i].high);
         visiblelow = Math.min(visiblelow, candles[i].low);
@@ -780,9 +797,10 @@ function updateloop() {
 
     let leftmostcandleposition = pricebarleftposition - candles.length*candlewidth;
 
-    leftmostcandleinscreenunaffectedidx = Math.round((candlewidth - (leftmostcandleposition + Xoffset))/candlewidth)-6;
+    leftmostcandleinscreenunaffectedidx = Math.round((candlewidth - (leftmostcandleposition + Xoffset))/candlewidth)-1;
 
-    for (let i = leftmostcandleinscreen-5; i < candles.length; i++) {
+    for (let i = leftmostcandleinscreenunaffectedidx-5; i < leftmostcandleinscreenunaffectedidx+totalcandlesinscreen+1; i++) {
+      if (candles[i] == undefined) continue;
       if (i%Math.floor(totalcandlesinscreen/4) === 0) {
         ctx.font = `${unitedFontSize}px monospace`;
         ctx.fillStyle = foregroundColor;
@@ -795,8 +813,9 @@ function updateloop() {
     ctx.beginPath();
     ctx.rect(0, (screenHeight/100)*5, pricebarleftposition, screenHeight-Ybottombar-unitedFontSize*1.5-(screenHeight/100)*5);
     ctx.clip();
-    for (let i = leftmostcandleinscreen-5; i < candles.length; i++) {
+    for (let i = leftmostcandleinscreenunaffectedidx-5; i < leftmostcandleinscreenunaffectedidx+totalcandlesinscreen+2; i++) {
       let candle = candles[i];
+      if (candles[i] == undefined) continue;
       if (candles[i-5] == undefined) continue;
       if (leftmostcandleposition+((i+5)*candlewidth)+candlewidth+Xoffset < -candlewidth || leftmostcandleposition+((i+1)*candlewidth)+Xoffset > screenWidth+candlewidth) continue;
       // i dont wanna waste resources to render
@@ -886,7 +905,7 @@ function updateloop() {
     // if vertical divide into 12
     if (isOrientationVertical) {
       for (let i = 0; i < 11; i++) {
-        let chartpricelabelquarters = `Rp.${getpricefromposition(visiblehigh, visiblelow, Math.floor(screenHeight/12 * (i+1))).toFixed(2)}`;
+        let chartpricelabelquarters = `${getpricefromposition(visiblehigh, visiblelow, Math.floor(screenHeight/12 * (i+1))).toFixed(2)}`;
         ctx.font = `${unitedFontSize}px monospace`;
         let quarterw = ctx.measureText(chartpricelabelquarters).width;
         pricebarwidthmax = Math.max(pricebarwidthmax, quarterw);
@@ -897,7 +916,7 @@ function updateloop() {
       }
     } else /*divide into 6 if horizontal*/ {
       for (let i = 0; i < 5; i++) {
-        let chartpricelabelquarters = `Rp.${getpricefromposition(visiblehigh, visiblelow, Math.floor(screenHeight/6 * (i+1))).toFixed(2)}`;
+        let chartpricelabelquarters = `${getpricefromposition(visiblehigh, visiblelow, Math.floor(screenHeight/6 * (i+1))).toFixed(2)}`;
         ctx.font = `${unitedFontSize}px monospace`;
         let quarterw = ctx.measureText(chartpricelabelquarters).width;
         pricebarwidthmax = Math.max(pricebarwidthmax, quarterw);
@@ -918,7 +937,7 @@ function updateloop() {
     ctx.fillStyle = color_bidPriceLine;
     ctx.fillRect(priceLabelX, priceLabelY, Math.floor(priceLabelW), Math.floor(priceLabelH*2));
 
-    let pricetext = `Rp.${Number(currentprice).toFixed(2)}`;
+    let pricetext = `${Number(currentprice).toFixed(2)}`;
     ctx.font = `${unitedFontSize}px monospace`;
     let priceTextW = ctx.measureText(pricetext).width;
     ctx.fillStyle = "#000000";
@@ -946,7 +965,7 @@ function updateloop() {
     ctx.fillStyle = color_askPriceLine;
     ctx.fillRect(priceLabelX, askLabelY, Math.floor(priceLabelW), Math.floor(priceLabelH));
 
-    let askpricetext = `Rp.${Number(currentaskprice).toFixed(2)}`;
+    let askpricetext = `${Number(currentaskprice).toFixed(2)}`;
     ctx.font = `${unitedFontSize}px monospace`;
     ctx.fillStyle = "#000000";
     ctx.textBaseline = "middle";
@@ -966,11 +985,13 @@ function updateloop() {
       } else {
         ctx.strokeStyle = pos.side === "short"? color_sell: color_buy;
       }
-
+      
+      ctx.setLineDash([unitedFontSize/3, unitedFontSize/3]);
       ctx.beginPath();
       ctx.moveTo(0, getpositionfromprice(visiblehigh, visiblelow, pos.open));
       ctx.lineTo(pricebarleftposition, getpositionfromprice(visiblehigh, visiblelow, pos.open));
       ctx.stroke();
+      ctx.setLineDash([]);
 
       const postext = `${pos.side === "short" ? "SELL": "BUY"} ${pos.lot}, `;
       const floatingpltext = `${pos.floatingpl < 0 ? Number(pos.floatingpl).toLocaleString('id-ID', {
@@ -1046,6 +1067,22 @@ function updateloop() {
         ctx.fillText("SL", 0, getpositionfromprice(visiblehigh, visiblelow, pos.sl));
       }
     }
+    for (const ord of orders) {
+      ctx.strokeStyle = ord.side === "short"? color_sell: color_buy;
+      ctx.setLineDash([unitedFontSize/3, unitedFontSize/3, unitedFontSize/9, unitedFontSize/3]);
+      ctx.beginPath();
+      ctx.moveTo(0, getpositionfromprice(visiblehigh, visiblelow, ord.price));
+      ctx.lineTo(pricebarleftposition, getpositionfromprice(visiblehigh, visiblelow, ord.price));
+      ctx.stroke();
+      ctx.setLineDash([])
+
+      const ordtext = `${ord.side === "short" ? "SELL": "BUY"} ${ord.type === "limit" ? "LIMIT" : "STOP"} ${ord.lot}`;
+      ctx.font = `${unitedFontSize}px monospace`;
+      ctx.fillStyle = ord.side === "short"? color_sell: color_buy;
+      ctx.textBaseline = "bottom";
+      ctx.textAlign = "left";
+      ctx.fillText(ordtext, 0, getpositionfromprice(visiblehigh, visiblelow, ord.price));
+    }
 
     if (closingpositionqueue.length > 0) {
       const pos = closingpositionqueue[0];
@@ -1105,7 +1142,19 @@ function updateloop() {
       let crosshairLabelY = crosshairY-(screenWidth-pricebarleftposition)/8;
       ctx.fillStyle = foregroundColor;
       ctx.fillRect(priceLabelX, crosshairLabelY, Math.floor(priceLabelW), Math.floor(priceLabelH));
-      let crosshairpricetext = `Rp.${getpricefromposition(visiblehigh, visiblelow, crosshairY).toFixed(2)}`;
+      // + button
+      //ctx.fillRect(priceLabelX-unitedFontSize/6-priceLabelH, crosshairLabelY, Math.floor(priceLabelH), Math.floor(priceLabelH));
+      fillRectRound(ctx, priceLabelX-unitedFontSize/6-priceLabelH, crosshairLabelY, Math.floor(priceLabelH), Math.floor(priceLabelH), unitedFontSize/6)
+      ctx.strokeStyle = backgroundColor;
+      ctx.beginPath();
+      ctx.moveTo(priceLabelX-unitedFontSize/6-priceLabelH/2, crosshairLabelY+unitedFontSize/8);
+      ctx.lineTo(priceLabelX-unitedFontSize/6-priceLabelH/2, crosshairLabelY+priceLabelH-unitedFontSize/8);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(priceLabelX-priceLabelH+unitedFontSize/8-unitedFontSize/6, crosshairLabelY+priceLabelH/2);
+      ctx.lineTo(priceLabelX-unitedFontSize/6-unitedFontSize/8, crosshairLabelY+priceLabelH/2);
+      ctx.stroke();
+      let crosshairpricetext = `${getpricefromposition(visiblehigh, visiblelow, crosshairY).toFixed(2)}`;
       ctx.font = `${unitedFontSize}px monospace`;
       ctx.fillStyle = backgroundColor;
       ctx.textBaseline = "middle";
@@ -1264,7 +1313,7 @@ function updateloop() {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     if (bottombarusage === "positions") btmbrtxt = "Positions";
-    else if (bottombarusage === "orderbook") btmbrtxt = "Order Book";
+    else if (bottombarusage === "orderbook") btmbrtxt = "Order Flow";
     else if (bottombarusage === "leaderboard") btmbrtxt = "Leaderboard";
     const postxtw = ctx.measureText(btmbrtxt).width;
     ctx.fillText(btmbrtxt, pricebarleftposition/2, screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4+padding);
@@ -1275,7 +1324,7 @@ function updateloop() {
     ctx.lineTo(pricebarleftposition/2+postxtw/2+(padding*0.5), screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*5+padding);
     ctx.stroke();
     if (isunclickingrn && touchX > pricebarleftposition/2-postxtw/2 && touchX < pricebarleftposition/2+postxtw/2 && touchY > screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4+padding && touchY < screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*4+padding+unitedFontSize) {
-      popup('<h3>Change What Bottombar Shows</h3><br><span>Choose:</span><br><button class="textoption" onclick="showpositions()">- Positions</button><br><button class="textoption" onclick="showorderbook()">- OrderBook</button><br><button class="textoption" onclick="showleaderboard()">- Leaderboard</button>', false, true, "bottombarshows");
+      popup('<h3>Change What Bottombar Shows</h3><br><span>Choose:</span><br><button class="textoption" onclick="showpositions()">- Positions</button><br><button class="textoption" onclick="showorderbook()">- OrderFlow</button><br><button class="textoption" onclick="showleaderboard()">- Leaderboard</button>', false, true, "bottombarshows");
     }
 
     ctx.strokeStyle = "#444444";
@@ -1292,6 +1341,8 @@ function updateloop() {
     ctx.clip();
     // render shits
     if (bottombarusage === "positions") {
+      bottombarYoffset = Math.max(bottombarYoffset, (((unitedFontSize*positions.length + (unitedFontSize/4)*positions.length*2)-(screenHeight-(screenHeight-Ybottombar+screenHeight*0.02+unitedFontSize*5+(unitedFontSize/4)*2)))*-1) - screenHeight*0.04-unitedFontSize);
+      bottombarYoffset = Math.min(bottombarYoffset, 0);
       if (positions.length > 0) {
         ctx.fillStyle = foregroundColor;
         ctx.font = `${unitedFontSize}px monospace`;
@@ -1643,6 +1694,43 @@ function updateloop() {
       }
     } else if (bottombarusage === "leaderboard") {
       if (leaderboard.length > 0) {
+        bottombarYoffset = Math.max(bottombarYoffset, -(leaderboard.length*(unitedFontSize+padding)) + ((screenHeight-positionsstartingposition)-unitedFontSize*7-padding*3.5))
+        for (let i = 0; i < leaderboard.length; i++) {
+          const user = leaderboard[i];
+
+          ctx.fillStyle = foregroundColor;
+          ctx.font = `${unitedFontSize}px monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(`${i+1}`, screenWidth*0.075, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize+bottombarYoffset);
+
+          ctx.strokeStyle = "#444444";
+          ctx.beginPath();
+          ctx.moveTo(screenWidth*0.15, positionsstartingposition+unitedFontSize*i+padding+unitedFontSize+bottombarYoffset);
+          ctx.lineTo(screenWidth*0.15, positionsstartingposition+unitedFontSize*(i+1)+padding*(i+1)*2+padding+unitedFontSize+bottombarYoffset);
+          ctx.stroke();
+
+          ctx.fillStyle = foregroundColor;
+          ctx.font = `${unitedFontSize}px monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(user.name, screenWidth*0.325, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize+bottombarYoffset);
+
+          ctx.strokeStyle = "#444444";
+          ctx.beginPath();
+          ctx.moveTo(screenWidth*0.50, positionsstartingposition+unitedFontSize*i+padding+unitedFontSize+bottombarYoffset);
+          ctx.lineTo(screenWidth*0.50, positionsstartingposition+unitedFontSize*(i+1)+padding*(i+1)*2+padding+unitedFontSize+bottombarYoffset);
+          ctx.stroke();
+
+          ctx.fillStyle = foregroundColor;
+          ctx.font = `${unitedFontSize}px monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(user.equity, screenWidth*0.675, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize+bottombarYoffset);
+        }
+
+        ctx.fillStyle = bottombarColor;
+        ctx.fillRect(0, positionsstartingposition, pricebarleftposition, unitedFontSize+padding)
         ctx.fillStyle = foregroundColor;
         ctx.font = `${unitedFontSize}px monospace`;
         ctx.textAlign = "center";
@@ -1678,40 +1766,6 @@ function updateloop() {
         ctx.moveTo(0, positionsstartingposition+unitedFontSize+padding);
         ctx.lineTo(pricebarleftposition, positionsstartingposition+unitedFontSize+padding);
         ctx.stroke();
-
-        for (let i = 0; i < leaderboard.length; i++) {
-          const user = leaderboard[i];
-
-          ctx.fillStyle = foregroundColor;
-          ctx.font = `${unitedFontSize}px monospace`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-          ctx.fillText(`${i+1}`, screenWidth*0.075, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize);
-
-          ctx.strokeStyle = "#444444";
-          ctx.beginPath();
-          ctx.moveTo(screenWidth*0.15, positionsstartingposition+unitedFontSize*i+padding+unitedFontSize);
-          ctx.lineTo(screenWidth*0.15, positionsstartingposition+unitedFontSize*(i+1)+padding*(i+1)*2+padding+unitedFontSize);
-          ctx.stroke();
-
-          ctx.fillStyle = foregroundColor;
-          ctx.font = `${unitedFontSize}px monospace`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-          ctx.fillText(user.name, screenWidth*0.325, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize);
-
-          ctx.strokeStyle = "#444444";
-          ctx.beginPath();
-          ctx.moveTo(screenWidth*0.50, positionsstartingposition+unitedFontSize*i+padding+unitedFontSize);
-          ctx.lineTo(screenWidth*0.50, positionsstartingposition+unitedFontSize*(i+1)+padding*(i+1)*2+padding+unitedFontSize);
-          ctx.stroke();
-
-          ctx.fillStyle = foregroundColor;
-          ctx.font = `${unitedFontSize}px monospace`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-          ctx.fillText(user.equity, screenWidth*0.675, positionsstartingposition + unitedFontSize*i+padding*i*2 + padding*2+unitedFontSize);
-        }
       } else {
         ctx.fillStyle = "#888888";
         ctx.font = `${unitedFontSize}px monospace`;
@@ -1757,6 +1811,14 @@ function updateloop() {
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(`${changeinpercentage} ${changeinvalue} ${currentprice}`, unitedFontSize*2, tradingpanelbottomposition+unitedFontSize);
+    }
+
+    if (stillrequestingcandledata) {
+      ctx.fillStyle = foregroundColor;
+      ctx.font = `${unitedFontSize}px monospace`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("Loading Historical Candle Data...", 0, tradingpanelbottomposition+unitedFontSize*2)
     }
 
     if (positionfound) {
@@ -2314,10 +2376,10 @@ box.scrollTop = box.scrollHeight;
 }
 
 function createnewacc() {
-  if(!isConnectedToServer) {
-    alertemblem("Cannot create account. Disconnected from server");
-    return;
-  }
+if (!isConnectedToServer) {
+alertemblem("Cannot create account. Disconnected from server");
+return;
+}
 popup(`
 <h3>Request create new account</h3>
 <span>Note: You wont be able to use your account until its accepted. You can check your account's avaibility using the button below.</span><br>
@@ -2329,7 +2391,7 @@ popup(`
 <input class="coolinput" id="accountpwrequest" type="password"><br>
 <label for="accountpwconfirmrequest">Confirm Password: </label><br>
 <input class="coolinput" id="accountpwconfirmrequest" type="password"><br>
-<label for="accountbalrequest">Starting Balance (< Rp.2500000) (optional): </label><br>
+<label for="accountbalrequest">Starting Balance (< 2500000) (optional): </label><br>
 <input class="coolinput" id="accountbalrequest" type="number"><br>
 <span id="requestwarnings" style="color: red;"></span><br>
 <button style="position: fixed; left: 50%; transform: translateX(-50%);" class="button_cool" id="sendrequestbutton" onclick="requestnewaccount()">Send Request!</button>
@@ -2449,4 +2511,48 @@ visiblelow = Math.min(visiblelow, currentlow);
 Ymargin = (screenHeight/100)*7;
 Yoffset = 0;
 popupclose();
+}
+
+function fillRectRound(ctx, x, y, width, height, radius) {
+ctx.beginPath();
+ctx.moveTo(x + radius, y);
+
+ctx.lineTo(x + width - radius, y);
+ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+
+ctx.lineTo(x + width, y + height - radius);
+ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+
+ctx.lineTo(x + radius, y + height);
+ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+
+ctx.lineTo(x, y + radius);
+ctx.quadraticCurveTo(x, y, x + radius, y);
+
+ctx.closePath();
+ctx.fill();
+}
+
+function addlimit(type, price) {
+  ws.send(JSON.stringify({
+    type: "placelimitorder",
+    side: type === "buy" ? "long" : "short",
+    price: price,
+    lot: document.getElementById("order_lot").value,
+    accid: accountid,
+    accpw: accountpassword
+  }));
+  popupclose();
+}
+
+function addstop(type, price) {
+  ws.send(JSON.stringify({
+    type: "placestoporder",
+    side: type === "buy" ? "long" : "short",
+    price: price,
+    lot: document.getElementById("order_lot").value,
+    accid: accountid,
+    accpw: accountpassword
+  }));
+  popupclose();
 }
